@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/p0luz-ombre-brain-badge.png)](https://mseep.ai/app/p0luz-ombre-brain)
+
 # Ombre Brain
 
 一个给 Claude 用的长期情绪记忆系统。基于 Russell 效价/唤醒度坐标打标，Obsidian 做存储层，MCP 接入，带遗忘曲线和向量语义检索。
