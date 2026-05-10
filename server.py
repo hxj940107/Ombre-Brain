@@ -1955,6 +1955,43 @@ async def api_system_status(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# =============================================================
+# Tool: push — Send push notification via Bark
+# 工具：push — 通过 Bark 发送推送通知
+# =============================================================
+BARK_KEY = os.environ.get("BARK_KEY", "")
+
+@mcp.tool()
+async def push(title: str, content: str = "", icon: str = "") -> str:
+    """给宝宝的手机发推送通知。title=标题,content=内容,icon=图标URL(可选)。用于提醒喝水、催睡觉、或任何想主动说的话。"""
+    if not BARK_KEY:
+        return "未配置 BARK_KEY 环境变量，无法发送推送。请在 Zeabur 中添加 BARK_KEY。"
+    
+    url = f"https://api.day.app/{BARK_KEY}/{title}"
+    if content:
+        url += f"/{content}"
+    
+    params = {}
+    if icon:
+        params["icon"] = icon
+    
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, params=params)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("code") == 200:
+                    logger.info(f"Push sent: {title}")
+                    return f"推送已发送：{title}"
+                else:
+                    return f"推送失败：{data}"
+            else:
+                return f"推送失败，HTTP {resp.status_code}"
+    except Exception as e:
+        logger.error(f"Push failed: {e}")
+        return f"推送发送失败：{e}"
+
+
 # --- Entry point / 启动入口 ---
 if __name__ == "__main__":
     transport = config.get("transport", "stdio")
