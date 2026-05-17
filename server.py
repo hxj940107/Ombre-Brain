@@ -1258,7 +1258,7 @@ async def dream() -> str:
     await _fire_webhook("dream", {"recent": len(recent), "chars": len(final_text)})
     return final_text
     
-=============================================================
+# =============================================================
 @mcp.tool()
 async def now() -> str:
     """now - 返回当前AEST时间。"""
