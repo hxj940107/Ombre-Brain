@@ -1262,8 +1262,9 @@ async def dream() -> str:
 @mcp.tool()
 async def now() -> str:
     """now - 返回当前AEST时间。"""
-    from utils import AEST
-    return datetime.now(AEST).strftime("%Y-%m-%d %H:%M:%S AEST (%A)")
+    from datetime import datetime, timezone, timedelta
+    aest = timezone(timedelta(hours=10))
+    return datetime.now(aest).strftime("%Y-%m-%d %H:%M:%S AEST (%A)")
     
 # =============================================================
 # Dashboard API endpoints (for lightweight Web UI)
