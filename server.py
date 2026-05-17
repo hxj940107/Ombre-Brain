@@ -1257,8 +1257,14 @@ async def dream() -> str:
     final_text = header + "\n---\n".join(parts) + connection_hint + crystal_hint
     await _fire_webhook("dream", {"recent": len(recent), "chars": len(final_text)})
     return final_text
-
-
+    
+=============================================================
+@mcp.tool()
+async def now() -> str:
+    """now - 返回当前AEST时间。"""
+    from utils import AEST
+    return datetime.now(AEST).strftime("%Y-%m-%d %H:%M:%S AEST (%A)")
+    
 # =============================================================
 # Dashboard API endpoints (for lightweight Web UI)
 # 仪表板 API（轻量 Web UI 用）
