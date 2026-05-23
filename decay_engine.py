@@ -5,21 +5,24 @@
 # Simulates human forgetting curve; auto-decays inactive memories and archives them.
 # 模拟人类遗忘曲线，自动衰减不活跃记忆并归档。
 #
-# Core formula (improved Ebbinghaus + emotion coordinates):
-# 核心公式（改进版艾宾浩斯遗忘曲线 + 情感坐标）：
-#   Score = Importance × (activation_count^0.3) × e^(-λ×days) × emotion_weight
+# Core formula (half-life based decay + freshness boost + emotion coordinates):
+# 核心公式（半衰期衰减 + 短期新鲜度加成 + 情感坐标）：
+#   Score = Importance × (activation_count^0.3)
+#           × emotion_weight × time_decay × freshness_boost
 #
-# Emotion weight (continuous coordinate, not discrete labels):
-# 情感权重（基于连续坐标而非离散列举）：
-#   emotion_weight = base + (arousal × arousal_boost)
-#   Higher arousal → higher emotion weight → slower decay
-#   唤醒度越高 → 情感权重越大 → 记忆衰减越慢
+#   time_decay     = 0.5 ^ (days_since_last_active / half_life_days)
+#   freshness_boost = 1.0 + e^(-hours/36)     # peaks at 2.0 on day 0, ≈1.0 after 3 days
+#   emotion_weight = base + arousal × arousal_boost
+#
+# half_life_days 可通过 config (decay.half_life_days) 或环境变量
+# OMBRE_BREATH_HALF_LIFE_DAYS 调整（默认 14 天）。
 #
 # Depended on by: server.py
 # 被谁依赖：server.py
 # ============================================================
 
 import math
+import os
 import asyncio
 import logging
 from datetime import datetime
@@ -39,9 +42,36 @@ class DecayEngine:
     def __init__(self, config: dict, bucket_mgr):
         # --- Load decay parameters / 加载衰减参数 ---
         decay_cfg = config.get("decay", {})
-        self.decay_lambda = decay_cfg.get("lambda", 0.05)
+        self.decay_lambda = decay_cfg.get("lambda", 0.05)  # legacy, retained for compat
         self.threshold = decay_cfg.get("threshold", 0.3)
         self.check_interval = decay_cfg.get("check_interval_hours", 24)
+
+        # --- Half-life (days) for the primary time decay factor ---
+        # --- 主时间衰减因子的半衰期（天）---
+        # Resolution order: env var > config.decay.half_life_days >
+        #                   derived from legacy lambda (ln2/λ) > default 14 days
+        env_hl = os.environ.get("OMBRE_BREATH_HALF_LIFE_DAYS", "").strip()
+        if env_hl:
+            try:
+                half_life = float(env_hl)
+            except ValueError:
+                half_life = None
+        else:
+            half_life = None
+        if half_life is None:
+            cfg_hl = decay_cfg.get("half_life_days")
+            if cfg_hl is not None:
+                try:
+                    half_life = float(cfg_hl)
+                except (TypeError, ValueError):
+                    half_life = None
+        if half_life is None:
+            # Derive from legacy lambda if it was explicitly customized
+            if "lambda" in decay_cfg and self.decay_lambda > 0:
+                half_life = math.log(2) / float(self.decay_lambda)
+            else:
+                half_life = 14.0
+        self.half_life_days = max(1.0, float(half_life))
 
         # --- Emotion weight params (continuous arousal coordinate) ---
         # --- 情感权重参数（基于连续 arousal 坐标）---
@@ -89,17 +119,22 @@ class DecayEngine:
         Calculate current activity score for a memory bucket.
         计算一个记忆桶的当前活跃度得分。
 
-        New model: short-term vs long-term weight separation.
-        新模型：短期/长期权重分离。
-        - Short-term (≤3 days): time_weight dominates, emotion amplifies
-        - Long-term (>3 days): emotion_weight dominates, time decays to floor
-        短期（≤3天）：时间权重主导，情感放大
-        长期（>3天）：情感权重主导，时间衰减到底线
+        Model:
+          score = importance × activation_count^0.3
+                  × emotion_weight × time_decay × freshness_boost
+                  × resolved_factor × urgency_boost
+
+          time_decay      = 0.5 ^ (days_since / half_life_days)   # 主时间衰减
+          freshness_boost = 1.0 + e^(-hours/36)                   # 短期新鲜度加成（≤3 天显著）
+          emotion_weight  = base + arousal × arousal_boost        # 情感权重
+
+        Pinned / protected / permanent buckets bypass decay entirely.
+        Feel buckets return a fixed moderate score (50.0).
         """
         if not isinstance(metadata, dict):
             return 0.0
 
-        # --- Pinned/protected buckets: never decay, importance locked to 10 ---
+        # --- Pinned/protected buckets: never decay, always top ---
         if metadata.get("pinned") or metadata.get("protected"):
             return 999.0
 
@@ -129,25 +164,21 @@ class DecayEngine:
             arousal = 0.3
         emotion_weight = self.emotion_base + arousal * self.arousal_boost
 
-        # --- Time weight ---
-        time_weight = self._calc_time_weight(days_since)
+        # --- Primary time decay (half-life based) ---
+        # half_life_days days passed → time_decay = 0.5
+        # Day 0: 1.0, day=half_life: 0.5, day=2×half_life: 0.25, …
+        time_decay = 0.5 ** (days_since / self.half_life_days)
 
-        # --- Short-term vs Long-term weight separation ---
-        # 短期（≤3天）：time_weight 占 70%，emotion 占 30%
-        # 长期（>3天）：emotion 占 70%，time_weight 占 30%
-        if days_since <= 3.0:
-            # Short-term: time dominates, emotion amplifies
-            combined_weight = time_weight * 0.7 + emotion_weight * 0.3
-        else:
-            # Long-term: emotion dominates, time provides baseline
-            combined_weight = emotion_weight * 0.7 + time_weight * 0.3
+        # --- Short-term freshness bonus (peaks at 2.0 on day 0, ≈1.0 after 3 days) ---
+        freshness_boost = self._calc_time_weight(days_since)
 
         # --- Base score ---
         base_score = (
             importance
             * (activation_count ** 0.3)
-            * math.exp(-self.decay_lambda * days_since)
-            * combined_weight
+            * emotion_weight
+            * time_decay
+            * freshness_boost
         )
 
         # --- Weight pool modifiers ---
@@ -283,8 +314,10 @@ class DecayEngine:
         self._running = True
         self._task = asyncio.create_task(self._background_loop())
         logger.info(
-            f"Decay engine started, interval: {self.check_interval}h / "
-            f"衰减引擎已启动，检查间隔: {self.check_interval} 小时"
+            f"Decay engine started, interval: {self.check_interval}h, "
+            f"half_life: {self.half_life_days}d / "
+            f"衰减引擎已启动，检查间隔: {self.check_interval} 小时，"
+            f"半衰期: {self.half_life_days} 天"
         )
 
     async def stop(self) -> None:

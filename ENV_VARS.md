@@ -15,6 +15,7 @@
 | `OMBRE_MODEL` | 否 | — | `OMBRE_DEHYDRATION_MODEL` 的别名（前者优先） |
 | `OMBRE_EMBEDDING_MODEL` | 否 | `gemini-embedding-001` | 向量嵌入模型名（覆盖 `embedding.model`） |
 | `OMBRE_EMBEDDING_BASE_URL` | 否 | — | 向量嵌入的 API Base URL（覆盖 `embedding.base_url`；留空则复用脱水配置） |
+| `OMBRE_BREATH_HALF_LIFE_DAYS` | 否 | `14` | breath 浮现权重的时间衰减半衰期（天）；建议 14~30 之间，越小则最近事件越占优势。覆盖 `decay.half_life_days` 配置项。 |
 
 ## 说明
 
