@@ -119,14 +119,24 @@ class DecayEngine:
         Calculate current activity score for a memory bucket.
         计算一个记忆桶的当前活跃度得分。
 
-        Model:
-          score = importance × activation_count^0.3
-                  × emotion_weight × time_decay × freshness_boost
+        Model (v2 — additive blending, no multiplicative explosion):
+          score = importance × activation_count^0.15
+                  × combined_recency × time_decay
                   × resolved_factor × urgency_boost
 
-          time_decay      = 0.5 ^ (days_since / half_life_days)   # 主时间衰减
-          freshness_boost = 1.0 + e^(-hours/36)                   # 短期新鲜度加成（≤3 天显著）
-          emotion_weight  = base + arousal × arousal_boost        # 情感权重
+          time_decay       = 0.5 ^ (days_since / half_life_days)    # 主时间衰减
+          freshness_boost  = 1.0 + e^(-hours/36)                    # 短期新鲜度（≤3 天显著）
+          emotion_weight   = base + arousal × arousal_boost         # 情感权重
+          combined_recency = (freshness_boost + emotion_weight) / 2 # 加性混合，防爆炸
+
+        Why additive blending: a multiplicative `emotion × freshness` would compound
+        for recently-touched high-arousal "legacy" buckets (e.g. story buckets that
+        get merged into repeatedly), keeping them at the top forever. Averaging caps
+        the combined effect so recent new buckets can compete.
+
+        activation_count uses a softer exponent (0.15) — being merged into many times
+        is not the same as being important *now*; it should not keep boosting the
+        score indefinitely.
 
         Pinned / protected / permanent buckets bypass decay entirely.
         Feel buckets return a fixed moderate score (50.0).
@@ -165,21 +175,21 @@ class DecayEngine:
         emotion_weight = self.emotion_base + arousal * self.arousal_boost
 
         # --- Primary time decay (half-life based) ---
-        # half_life_days days passed → time_decay = 0.5
-        # Day 0: 1.0, day=half_life: 0.5, day=2×half_life: 0.25, …
         time_decay = 0.5 ** (days_since / self.half_life_days)
 
         # --- Short-term freshness bonus (peaks at 2.0 on day 0, ≈1.0 after 3 days) ---
         freshness_boost = self._calc_time_weight(days_since)
 
+        # --- Additive combined recency: prevents multiplicative explosion ---
+        # Both factors are roughly in [1.0, 2.0]; averaging keeps the combined
+        # multiplier ≤ ~1.9 instead of ≤ ~4.0 you'd get from multiplying.
+        combined_recency = (freshness_boost + emotion_weight) / 2.0
+
+        # --- Activation count: softer influence (^0.15 instead of ^0.3) ---
+        activation_factor = activation_count ** 0.15
+
         # --- Base score ---
-        base_score = (
-            importance
-            * (activation_count ** 0.3)
-            * emotion_weight
-            * time_decay
-            * freshness_boost
-        )
+        base_score = importance * activation_factor * combined_recency * time_decay
 
         # --- Weight pool modifiers ---
         # resolved + digested (has feel) → accelerated fade: ×0.02
@@ -194,7 +204,7 @@ class DecayEngine:
             resolved_factor = 0.05
         else:
             resolved_factor = 1.0
-        urgency_boost = 1.5 if (arousal > 0.7 and not resolved) else 1.0
+        urgency_boost = 1.3 if (arousal > 0.7 and not resolved) else 1.0
 
         return round(base_score * resolved_factor * urgency_boost, 4)
 

@@ -595,9 +595,12 @@ async def breath(
 
         # --- Unresolved buckets: surface top N by weight ---
         # --- 未解决桶：按权重浮现前 N 条 ---
+        # digested=True 桶（trace 时显式标记"保留但不浮现"）也排除，
+        # 保持与 trace 工具 docstring 一致的语义。
         unresolved = [
             b for b in all_buckets
             if not b["metadata"].get("resolved", False)
+            and not b["metadata"].get("digested", False)
             and b["metadata"].get("type") not in ("permanent", "feel")
             and not b["metadata"].get("pinned", False)
             and not b["metadata"].get("protected", False)
