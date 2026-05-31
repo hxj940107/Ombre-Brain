@@ -624,7 +624,7 @@ async def breath(
                 non_cold = top1 + pool + non_cold[min(20, len(non_cold)):]
             candidates = cold_start + non_cold
         # Hard cap: never surface more than max_results buckets
-        candidates = candidates[:max_results]
+        candidates = candidates[:min(max_results, 8)]
 
         dynamic_results = []
         for b in candidates:
