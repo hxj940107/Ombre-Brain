@@ -24,7 +24,6 @@
 #                系统状态 + 所有桶列表
 #       dream  — Surface recent dynamic buckets for self-digestion
 #                返回最近桶 供模型自省/写 feel
-#       now    — Get current time
 #
 # Startup:
 # 启动方式：
@@ -1326,17 +1325,20 @@ async def now() -> str:
     aest = timezone(timedelta(hours=10))
     return datetime.now(aest).strftime("%Y-%m-%d %H:%M:%S AEST (%A)")
 
-@mcp.tool()
-async def sense(hours: int = 2) -> str:
-     """sense - 感知层：查看用户最近的手机活动..."""
-     events = _get_recent_events(hours=hours)
-     if not events:
-         return f"最近 {hours} 小时无活动记录。"
-     lines = [f"最近 {hours} 小时的活动（{len(events)} 条）："]
-     for e in events:
-         lines.append(f"  - {e['time']}  {e['type']}: {e['value']}")
-     return "\n".join(lines)
 
+@mcp.tool()
+async def sense(hours: int = 6) -> str:
+    """sense - 感知层：查看用户最近的手机活动（由 iOS 快捷指令自动上报）。
+    hours: 查看最近几小时的活动，默认 6 小时。
+    无活动时返回空。"""
+    events = _get_recent_events(hours=hours)
+    if not events:
+        return f"最近 {hours} 小时无活动记录。"
+    lines = [f"最近 {hours} 小时的活动（{len(events)} 条）："]
+    for e in events:
+        lines.append(f"  - {e['time']}  {e['type']}: {e['value']}")
+    return "\n".join(lines)
+    
 # =============================================================
 # Dashboard API endpoints (for lightweight Web UI)
 # 仪表板 API（轻量 Web UI 用）
@@ -2008,10 +2010,13 @@ async def api_events_report(request):
 
 @mcp.custom_route("/api/events/recent", methods=["GET"])
 async def api_events_recent(request):
-    """Get recent events (dashboard auth required)."""
+    """Get recent events (dashboard auth or token auth)."""
     from starlette.responses import JSONResponse
-    err = _require_auth(request)
-    if err: return err
+    # Accept either cookie auth or token auth
+    token = request.query_params.get("token", "")
+    if not (OMBRE_EVENTS_TOKEN and token == OMBRE_EVENTS_TOKEN):
+        err = _require_auth(request)
+        if err: return err
     hours = int(request.query_params.get("hours", "6"))
     events = _get_recent_events(hours=hours)
     return JSONResponse({"events": events, "count": len(events)})
