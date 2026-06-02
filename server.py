@@ -1338,6 +1338,270 @@ async def sense(hours: int = 6) -> str:
     for e in events:
         lines.append(f"  - {e['time']}  {e['type']}: {e['value']}")
     return "\n".join(lines)
+
+# =============================================================
+# HTTP REST API Endpoints — 供 Telegram Bot 直接 HTTP 调用
+# 
+# 把这整块代码粘贴到 server.py 里，
+# 放在最后一个 @mcp.tool() 函数（now）之后、
+# dashboard 路由或 if __name__ == "__main__" 之前。
+#
+# 用法：
+#   POST /api/breath   — 检索/浮现记忆
+#   POST /api/hold     — 存储记忆
+#   POST /api/grow     — 日记归档
+#   POST /api/trace    — 修改/删除记忆
+#   GET  /api/pulse    — 系统状态
+#   GET  /api/dream    — 最近记忆（供自省）
+#   GET  /api/now      — 当前 AEST 时间
+#
+# 认证方式：
+#   请求头带 Authorization: Bearer <你的密码>
+#   密码 = 环境变量 OMBRE_DASHBOARD_PASSWORD 的值
+#   或者 OMBRE_API_TOKEN 环境变量（如果你想用单独的token）
+# =============================================================
+
+
+def _check_api_auth(request):
+    """检查 HTTP API 请求的认证。返回 JSONResponse(401) 或 None。"""
+    from starlette.responses import JSONResponse
+    
+    # 从 Authorization header 取 Bearer token
+    auth_header = request.headers.get("authorization", "")
+    token = ""
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    
+    # 也支持 x-api-token header（方便 curl 测试）
+    if not token:
+        token = request.headers.get("x-api-token", "").strip()
+    
+    if not token:
+        return JSONResponse({"error": "Missing auth token"}, status_code=401)
+    
+    # 先检查专用 API token，再检查 dashboard 密码
+    api_token = os.environ.get("OMBRE_API_TOKEN", "").strip()
+    if api_token and hmac.compare_digest(token, api_token):
+        return None
+    
+    # fallback: 用 dashboard 密码验证
+    if _verify_any_password(token):
+        return None
+    
+    return JSONResponse({"error": "Invalid token"}, status_code=401)
+
+
+# --- GET /api/now ---
+@mcp.custom_route("/api/now", methods=["GET"])
+async def api_now(request):
+    """返回当前 AEST 时间"""
+    from starlette.responses import JSONResponse
+    from datetime import datetime, timezone, timedelta
+    
+    err = _check_api_auth(request)
+    if err:
+        return err
+    
+    aest = timezone(timedelta(hours=10))
+    now_aest = datetime.now(aest)
+    return JSONResponse({
+        "time": now_aest.strftime("%Y-%m-%d %H:%M:%S AEST"),
+        "weekday": now_aest.strftime("%A"),
+        "iso": now_aest.isoformat(),
+    })
+
+
+# --- POST /api/breath ---
+@mcp.custom_route("/api/breath", methods=["POST"])
+async def api_breath(request):
+    """HTTP 版 breath：检索/浮现记忆"""
+    from starlette.responses import JSONResponse
+    
+    err = _check_api_auth(request)
+    if err:
+        return err
+    
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    
+    try:
+        result = await breath(
+            query=body.get("query", ""),
+            max_tokens=body.get("max_tokens", 10000),
+            domain=body.get("domain", ""),
+            valence=body.get("valence", -1),
+            arousal=body.get("arousal", -1),
+            max_results=body.get("max_results", 20),
+            importance_min=body.get("importance_min", -1),
+        )
+        return JSONResponse({"ok": True, "result": result})
+    except Exception as e:
+        logger.error(f"API breath failed: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# --- POST /api/hold ---
+@mcp.custom_route("/api/hold", methods=["POST"])
+async def api_hold(request):
+    """HTTP 版 hold：存储记忆"""
+    from starlette.responses import JSONResponse
+    
+    err = _check_api_auth(request)
+    if err:
+        return err
+    
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    
+    content = body.get("content", "").strip()
+    if not content:
+        return JSONResponse({"error": "content is required"}, status_code=400)
+    
+    try:
+        result = await hold(
+            content=content,
+            tags=body.get("tags", ""),
+            importance=body.get("importance", 5),
+            pinned=body.get("pinned", False),
+            feel=body.get("feel", False),
+            source_bucket=body.get("source_bucket", ""),
+            valence=body.get("valence", -1),
+            arousal=body.get("arousal", -1),
+        )
+        return JSONResponse({"ok": True, "result": result})
+    except Exception as e:
+        logger.error(f"API hold failed: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# --- POST /api/grow ---
+@mcp.custom_route("/api/grow", methods=["POST"])
+async def api_grow(request):
+    """HTTP 版 grow：日记归档"""
+    from starlette.responses import JSONResponse
+    
+    err = _check_api_auth(request)
+    if err:
+        return err
+    
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    
+    content = body.get("content", "").strip()
+    if not content:
+        return JSONResponse({"error": "content is required"}, status_code=400)
+    
+    try:
+        result = await grow(content=content)
+        return JSONResponse({"ok": True, "result": result})
+    except Exception as e:
+        logger.error(f"API grow failed: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# --- POST /api/trace ---
+@mcp.custom_route("/api/trace", methods=["POST"])
+async def api_trace(request):
+    """HTTP 版 trace：修改/删除记忆"""
+    from starlette.responses import JSONResponse
+    
+    err = _check_api_auth(request)
+    if err:
+        return err
+    
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    
+    bucket_id = body.get("bucket_id", "").strip()
+    if not bucket_id:
+        return JSONResponse({"error": "bucket_id is required"}, status_code=400)
+    
+    try:
+        result = await trace(
+            bucket_id=bucket_id,
+            name=body.get("name", ""),
+            domain=body.get("domain", ""),
+            valence=body.get("valence", -1),
+            arousal=body.get("arousal", -1),
+            importance=body.get("importance", -1),
+            tags=body.get("tags", ""),
+            resolved=body.get("resolved", -1),
+            pinned=body.get("pinned", -1),
+            digested=body.get("digested", -1),
+            content=body.get("content", ""),
+            delete=body.get("delete", False),
+        )
+        return JSONResponse({"ok": True, "result": result})
+    except Exception as e:
+        logger.error(f"API trace failed: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# --- GET /api/pulse ---
+@mcp.custom_route("/api/pulse", methods=["GET"])
+async def api_pulse(request):
+    """HTTP 版 pulse：系统状态"""
+    from starlette.responses import JSONResponse
+    
+    err = _check_api_auth(request)
+    if err:
+        return err
+    
+    try:
+        result = await pulse()
+        return JSONResponse({"ok": True, "result": result})
+    except Exception as e:
+        logger.error(f"API pulse failed: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# --- GET /api/dream ---
+@mcp.custom_route("/api/dream", methods=["GET"])
+async def api_dream(request):
+    """HTTP 版 dream：最近记忆供自省"""
+    from starlette.responses import JSONResponse
+    
+    err = _check_api_auth(request)
+    if err:
+        return err
+    
+    try:
+        result = await dream()
+        return JSONResponse({"ok": True, "result": result})
+    except Exception as e:
+        logger.error(f"API dream failed: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# --- GET /api/sense ---
+@mcp.custom_route("/api/sense", methods=["GET"])
+async def api_sense(request):
+    """HTTP 版 sense：查看最近手机活动"""
+    from starlette.responses import JSONResponse
+    
+    err = _check_api_auth(request)
+    if err:
+        return err
+    
+    try:
+        hours = int(request.query_params.get("hours", "2"))
+    except ValueError:
+        hours = 2
+    
+    try:
+        result = await sense(hours=hours)
+        return JSONResponse({"ok": True, "result": result})
+    except Exception as e:
+        logger.error(f"API sense failed: {e}")
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
     
 # =============================================================
 # Dashboard API endpoints (for lightweight Web UI)
