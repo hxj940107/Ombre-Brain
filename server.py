@@ -1952,3 +1952,64 @@ if __name__ == "__main__":
         uvicorn.run(_app, host="0.0.0.0", port=OMBRE_PORT)
     else:
         mcp.run(transport=transport)
+
+# =============================================================
+# /hold-hook
+# HTTP 写入记忆（供前端调用）
+# =============================================================
+@mcp.custom_route("/hold-hook", methods=["POST"])
+async def hold_hook(request):
+    from starlette.responses import JSONResponse
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"ok": False, "error": "Invalid JSON"},
+            status_code=400,
+        )
+
+    content = (body.get("content") or "").strip()
+
+    if not content:
+        return JSONResponse(
+            {"ok": False, "error": "content is required"},
+            status_code=400,
+        )
+
+    tags = body.get("tags", "")
+    importance = int(body.get("importance", 5))
+    pinned = bool(body.get("pinned", False))
+    feel = bool(body.get("feel", False))
+    source_bucket = body.get("source_bucket", "")
+
+    valence = body.get("valence", -1)
+    arousal = body.get("arousal", -1)
+
+    try:
+        result = await hold(
+            content=content,
+            tags=tags,
+            importance=importance,
+            pinned=pinned,
+            feel=feel,
+            source_bucket=source_bucket,
+            valence=valence,
+            arousal=arousal,
+        )
+
+        return JSONResponse({
+            "ok": True,
+            "result": result
+        })
+
+    except Exception as e:
+        logger.exception("hold-hook failed")
+
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": str(e)
+            },
+            status_code=500,
+        )
