@@ -335,15 +335,19 @@ async def breath_hook(request):
                       and not b["metadata"].get("protected")]
         scored = sorted(unresolved, key=lambda b: decay_engine.calculate_score(b["metadata"]), reverse=True)
 
-        parts = []
+                parts = []
         token_budget = 2000
+
         for b in pinned:
-            summary = await dehydrator.dehydrate(strip_wikilinks(b["content"]), {k: v for k, v in b["metadata"].items() if k != "tags"})
+            summary = await dehydrator.dehydrate(
+                strip_wikilinks(b["content"]),
+                {k: v for k, v in b["metadata"].items() if k != "tags"}
+            )
             parts.append(f"📌 [核心准则] {summary}")
             token_budget -= count_tokens_approx(summary)
 
-        # Diversity: top-1 fixed + shuffle rest from top-20
-                candidates = list(scored)
+        # Diversity: top-1 fixed + shuffle rest from top-5
+        candidates = list(scored)
 
         if len(candidates) > 1:
             top1 = [candidates[0]]
@@ -351,7 +355,7 @@ async def breath_hook(request):
             random.shuffle(pool)
             candidates = top1 + pool + candidates[min(5, len(candidates)):]
 
-        # Hard cap: max 5 surfacing buckets in hook
+        # Hard cap: max 5 surfacing buckets
         candidates = candidates[:5]
 
         for b in candidates:
@@ -374,8 +378,17 @@ async def breath_hook(request):
         if not parts:
             await _fire_webhook("breath_hook", {"surfaced": 0})
             return PlainTextResponse("")
+
         body_text = "[Ombre Brain - 记忆浮现]\n" + "\n---\n".join(parts)
-        await _fire_webhook("breath_hook", {"surfaced": len(parts), "chars": len(body_text)})
+
+        await _fire_webhook(
+            "breath_hook",
+            {
+                "surfaced": len(parts),
+                "chars": len(body_text)
+            }
+        )
+
         return PlainTextResponse(body_text)
     except Exception as e:
         logger.warning(f"Breath hook failed: {e}")
