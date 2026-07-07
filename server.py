@@ -353,7 +353,7 @@ async def breath_hook(request):
 # Hard cap: max 5 surfacing buckets in hook
 candidates = candidates[:5]
 
-        for b in candidates:
+for b in candidates:
             if token_budget <= 0:
                 break
             summary = await dehydrator.dehydrate(strip_wikilinks(b["content"]), {k: v for k, v in b["metadata"].items() if k != "tags"})
