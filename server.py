@@ -351,7 +351,7 @@ async def breath_hook(request):
         parts = []
         token_budget = 1000
 
-        for b in pinned:
+        for b in pinned[:5]:
             summary = await dehydrator.dehydrate(
                 strip_wikilinks(b["content"]),
                 {k: v for k, v in b["metadata"].items() if k != "tags"}
