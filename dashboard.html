@@ -1195,12 +1195,47 @@ async function showDetail(id) {
         '<div class="field"><label>创建</label>' + (meta.created || '—') + '</div>' +
         '<div class="field"><label>最后活跃</label>' + (meta.last_active || '—') + '</div>' +
       '</div>' +
+
+      '<div style="margin:16px 0;">' +
+        '<button onclick="togglePin(\'' + id + '\',' + (!meta.pinned) + ')">' +
+          (meta.pinned ? '📍取消固定' : '📌固定') +
+        '</button>' +
+      '</div>' +
+
       '<div class="detail-content">' + esc(b.content) + '</div>';
   } catch (e) {
     content.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
   }
 }
 
+async function togglePin(id, pinned) {
+  try {
+    const res = await fetch(BASE + "/api/pin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        bucket_id: id,
+        pinned: pinned
+      })
+    })
+
+    const data = await res.json()
+
+    if (!data.success) {
+      alert(data.error || "操作失败")
+      return
+    }
+
+    await loadBuckets()
+    await showDetail(id)
+
+  } catch (e) {
+    alert(e.message)
+  }
+}
+  
 function closeDetail() {
   document.getElementById('detail-panel').classList.remove('open');
 }
