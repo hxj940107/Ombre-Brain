@@ -343,23 +343,31 @@ async def breath_hook(request):
             token_budget -= count_tokens_approx(summary)
 
         # Diversity: top-1 fixed + shuffle rest from top-20
-        candidates = list(scored)
+                candidates = list(scored)
+
         if len(candidates) > 1:
-    top1 = [candidates[0]]
-    pool = candidates[1:min(5, len(candidates))]
-    random.shuffle(pool)
-    candidates = top1 + pool + candidates[min(5, len(candidates)):]
+            top1 = [candidates[0]]
+            pool = candidates[1:min(5, len(candidates))]
+            random.shuffle(pool)
+            candidates = top1 + pool + candidates[min(5, len(candidates)):]
 
-# Hard cap: max 5 surfacing buckets in hook
-candidates = candidates[:5]
+        # Hard cap: max 5 surfacing buckets in hook
+        candidates = candidates[:5]
 
-for b in candidates:
+        for b in candidates:
             if token_budget <= 0:
                 break
-            summary = await dehydrator.dehydrate(strip_wikilinks(b["content"]), {k: v for k, v in b["metadata"].items() if k != "tags"})
+
+            summary = await dehydrator.dehydrate(
+                strip_wikilinks(b["content"]),
+                {k: v for k, v in b["metadata"].items() if k != "tags"}
+            )
+
             summary_tokens = count_tokens_approx(summary)
+
             if summary_tokens > token_budget:
                 break
+
             parts.append(summary)
             token_budget -= summary_tokens
 
