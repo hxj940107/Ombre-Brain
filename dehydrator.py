@@ -271,7 +271,7 @@ class Dehydrator:
 
         result = await self._api_dehydrate(content)
 
-        logger.info(f"DEHYDRATE RESULT: {result}")
+        logger.info(f"RAW RESULT: {result}")
 
         # 只保留 summary，避免整个 JSON 注入 Claude
         try:
@@ -279,6 +279,8 @@ class Dehydrator:
 
             if isinstance(obj, dict):
                 result = obj.get("summary", result)
+        
+            logger.info(f"SUMMARY RESULT: {result}")
 
         except Exception as e:
             logger.warning(f"JSON parse failed: {e}")
