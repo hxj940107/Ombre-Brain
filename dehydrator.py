@@ -242,38 +242,50 @@ class Dehydrator:
     # 仅通过 API 脱水（无本地回退）
     # ---------------------------------------------------------
     async def dehydrate(self, content: str, metadata: dict = None) -> str:
-        """
-        Dehydrate/compress memory content.
-        Returns formatted summary string ready for Claude context injection.
-        Uses SQLite cache to avoid redundant API calls.
-        对记忆内容做脱水压缩。
-        返回格式化的摘要字符串，可直接注入 Claude 上下文。
-        使用 SQLite 缓存避免重复调用 API。
-        """
-        if not content or not content.strip():
-            return "（空记忆 / empty memory）"
+    """
+    Dehydrate/compress memory content.
+    Returns formatted summary string ready for Claude context injection.
+    Uses SQLite cache to avoid redundant API calls.
+    对记忆内容做脱水压缩。
+    返回格式化的摘要字符串，可直接注入 Claude 上下文。
+    使用 SQLite 缓存避免重复调用 API。
+    """
+    if not content or not content.strip():
+        return "（空记忆 / empty memory）"
 
-        # --- Content is short enough, no compression needed ---
-        # --- 内容已经很短，不需要压缩 ---
-        if count_tokens_approx(content) < 30:
-            return self._format_output(content, metadata)
+    # --- Content is short enough, no compression needed ---
+    if count_tokens_approx(content) < 30:
+        return self._format_output(content, metadata)
 
-        # --- Check cache first ---
-        # --- 先查缓存 ---
-        cached = self._get_cached_summary(content)
-        if cached:
-            return self._format_output(cached, metadata)
+    # --- Check cache first ---
+    cached = self._get_cached_summary(content)
+    if cached:
+        return self._format_output(cached, metadata)
 
-        # --- API dehydration (no local fallback) ---
-        # --- API 脱水（无本地降级）---
-        if not self.api_available:
-            raise RuntimeError("脱水 API 不可用，请配置 OMBRE_API_KEY")
+    # --- API dehydration ---
+    if not self.api_available:
+        raise RuntimeError("脱水 API 不可用，请配置 OMBRE_API_KEY")
 
-        result = await self._api_dehydrate(content)
-        logger.info(f"DEHYDRATE RESULT: {result}")
-        # --- Cache the result ---
-        self._set_cached_summary(content, result)
-        return self._format_output(result, metadata)
+    result = await self._api_dehydrate(content)
+
+    logger.info(f"DEHYDRATE RESULT: {result}")
+
+    # -----------------------------
+    # 只保留 summary，避免整个 JSON 注入 Claude
+    # -----------------------------
+    try:
+        obj = json.loads(result)
+
+        if isinstance(obj, dict):
+            result = obj.get("summary", result)
+
+    except Exception:
+        pass
+
+    # --- Cache the result ---
+    self._set_cached_summary(content, result)
+
+    return self._format_output(result, metadata)
 
     # ---------------------------------------------------------
     # Merge: blend new content into existing bucket
