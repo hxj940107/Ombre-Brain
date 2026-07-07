@@ -257,8 +257,11 @@ class Dehydrator:
         if count_tokens_approx(content) < 30:
             return self._format_output(content, metadata)
 
-        # --- Check cache first ---
-        cached = self._get_cached_summary(content)
+        # -------------------------------------------------
+        # 临时关闭缓存，强制重新脱水（测试）
+        # -------------------------------------------------
+        cached = None
+
         if cached:
             return self._format_output(cached, metadata)
 
