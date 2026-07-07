@@ -255,11 +255,23 @@ class Dehydrator:
 
         # --- Content is short enough, no compression needed ---
         if count_tokens_approx(content) < 30:
+            # 即使是短内容，也尝试提取 JSON 里的 summary，
+            # 防止历史桶保存的是完整 JSON。
+            try:
+                obj = json.loads(content)
+
+                if isinstance(obj, dict):
+                    content = obj.get("summary", content)
+
+            except Exception:
+                pass
+
             return self._format_output(content, metadata)
 
         # -------------------------------------------------
         # 临时关闭缓存，强制重新脱水（测试）
         # -------------------------------------------------
+
         cached = None
 
         if cached:
