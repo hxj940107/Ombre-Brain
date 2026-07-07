@@ -1989,6 +1989,49 @@ async def api_import_review(request):
 
     return JSONResponse({"applied": applied, "errors": errors})
 
+@mcp.custom_route("/api/pin", methods=["POST"])
+async def api_pin_bucket(request):
+    from starlette.responses import JSONResponse
+
+    err = _require_auth(request)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+
+        bucket_id = body.get("bucket_id")
+        pinned = body.get("pinned", True)
+
+        if not bucket_id:
+            return JSONResponse(
+                {"error": "missing bucket_id"},
+                status_code=400
+            )
+
+        ok = await bucket_mgr.update(
+            bucket_id,
+            pinned=bool(pinned)
+        )
+
+        if not ok:
+            return JSONResponse(
+                {"error": "bucket not found"},
+                status_code=404
+            )
+
+        return JSONResponse({
+            "success": True,
+            "bucket_id": bucket_id,
+            "pinned": bool(pinned)
+        })
+
+    except Exception as e:
+        return JSONResponse(
+            {"error": str(e)},
+            status_code=500
+        )
+
 
 # =============================================================
 # /api/status — system status for Dashboard settings tab
