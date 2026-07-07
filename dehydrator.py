@@ -270,6 +270,7 @@ class Dehydrator:
             raise RuntimeError("脱水 API 不可用，请配置 OMBRE_API_KEY")
 
         result = await self._api_dehydrate(content)
+        print(result)
         # --- Cache the result ---
         self._set_cached_summary(content, result)
         return self._format_output(result, metadata)
