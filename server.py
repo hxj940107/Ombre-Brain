@@ -382,6 +382,9 @@ async def breath_hook(request):
 
             summary_tokens = count_tokens_approx(summary)
 
+print("MEMORY TOKEN:", summary_tokens)
+print("MEMORY PREVIEW:", summary[:100])
+
             if summary_tokens > token_budget:
                 break
 
