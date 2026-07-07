@@ -323,19 +323,32 @@ async def health_check(request):
 @mcp.custom_route("/breath-hook", methods=["GET"])
 async def breath_hook(request):
     from starlette.responses import PlainTextResponse
+
     try:
         all_buckets = await bucket_mgr.list_all(include_archive=False)
-        # pinned
-        pinned = [b for b in all_buckets if b["metadata"].get("pinned") or b["metadata"].get("protected")]
-        # top 2 unresolved by score
-        unresolved = [b for b in all_buckets
-                      if not b["metadata"].get("resolved", False)
-                      and b["metadata"].get("type") not in ("permanent", "feel")
-                      and not b["metadata"].get("pinned")
-                      and not b["metadata"].get("protected")]
-        scored = sorted(unresolved, key=lambda b: decay_engine.calculate_score(b["metadata"]), reverse=True)
 
-                parts = []
+        # pinned
+        pinned = [
+            b for b in all_buckets
+            if b["metadata"].get("pinned") or b["metadata"].get("protected")
+        ]
+
+        # unresolved
+        unresolved = [
+            b for b in all_buckets
+            if not b["metadata"].get("resolved", False)
+            and b["metadata"].get("type") not in ("permanent", "feel")
+            and not b["metadata"].get("pinned")
+            and not b["metadata"].get("protected")
+        ]
+
+        scored = sorted(
+            unresolved,
+            key=lambda b: decay_engine.calculate_score(b["metadata"]),
+            reverse=True
+        )
+
+        parts = []
         token_budget = 2000
 
         for b in pinned:
@@ -355,7 +368,7 @@ async def breath_hook(request):
             random.shuffle(pool)
             candidates = top1 + pool + candidates[min(5, len(candidates)):]
 
-        # Hard cap: max 5 surfacing buckets
+        # Hard cap
         candidates = candidates[:5]
 
         for b in candidates:
@@ -379,6 +392,21 @@ async def breath_hook(request):
             await _fire_webhook("breath_hook", {"surfaced": 0})
             return PlainTextResponse("")
 
+        body_text = "[Ombre Brain - 记忆浮现]\n" + "\n---\n".join(parts)
+
+        await _fire_webhook(
+            "breath_hook",
+            {
+                "surfaced": len(parts),
+                "chars": len(body_text)
+            }
+        )
+
+        return PlainTextResponse(body_text)
+
+    except Exception as e:
+        logger.warning(f"Breath hook failed: {e}")
+        return PlainTextResponse("")
         body_text = "[Ombre Brain - 记忆浮现]\n" + "\n---\n".join(parts)
 
         await _fire_webhook(
