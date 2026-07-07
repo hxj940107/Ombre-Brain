@@ -349,7 +349,7 @@ async def breath_hook(request):
         )
 
         parts = []
-        token_budget = 2000
+        token_budget = 1000
 
         for b in pinned:
             summary = await dehydrator.dehydrate(
@@ -369,7 +369,7 @@ async def breath_hook(request):
             candidates = top1 + pool + candidates[min(5, len(candidates)):]
 
         # Hard cap
-        candidates = candidates[:5]
+        candidates = candidates[:3]
 
         for b in candidates:
             if token_budget <= 0:
