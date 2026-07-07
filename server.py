@@ -345,12 +345,13 @@ async def breath_hook(request):
         # Diversity: top-1 fixed + shuffle rest from top-20
         candidates = list(scored)
         if len(candidates) > 1:
-            top1 = [candidates[0]]
-            pool = candidates[1:min(20, len(candidates))]
-            random.shuffle(pool)
-            candidates = top1 + pool + candidates[min(20, len(candidates)):]
-        # Hard cap: max 20 surfacing buckets in hook
-        candidates = candidates[:20]
+    top1 = [candidates[0]]
+    pool = candidates[1:min(5, len(candidates))]
+    random.shuffle(pool)
+    candidates = top1 + pool + candidates[min(5, len(candidates)):]
+
+# Hard cap: max 5 surfacing buckets in hook
+candidates = candidates[:5]
 
         for b in candidates:
             if token_budget <= 0:
