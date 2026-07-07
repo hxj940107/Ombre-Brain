@@ -280,8 +280,8 @@ class Dehydrator:
             if isinstance(obj, dict):
                 result = obj.get("summary", result)
 
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"JSON parse failed: {e}")
 
         # --- Cache the result ---
         self._set_cached_summary(content, result)
