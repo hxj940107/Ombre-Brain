@@ -2122,7 +2122,47 @@ async def api_update_bucket_content(request):
             {"error": str(e)},
             status_code=500
         )
+# =============================================================
+# /api/delete-bucket — delete bucket permanently
+# 删除记忆桶
+# =============================================================
+@mcp.custom_route("/api/delete-bucket", methods=["POST"])
+async def api_delete_bucket(request):
+    from starlette.responses import JSONResponse
 
+    err = _require_auth(request)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+
+        bucket_id = body.get("bucket_id")
+
+        if not bucket_id:
+            return JSONResponse(
+                {"error": "missing bucket_id"},
+                status_code=400
+            )
+
+        ok = await bucket_mgr.delete(bucket_id)
+
+        if not ok:
+            return JSONResponse(
+                {"error": "bucket not found"},
+                status_code=404
+            )
+
+        return JSONResponse({
+            "success": True,
+            "bucket_id": bucket_id
+        })
+
+    except Exception as e:
+        return JSONResponse(
+            {"error": str(e)},
+            status_code=500
+        )
 # =============================================================
 # /api/merge-buckets — merge multiple memory buckets
 # 合并多个记忆桶
