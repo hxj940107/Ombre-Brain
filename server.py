@@ -2078,31 +2078,6 @@ async def api_rename_bucket(request):
 # /api/status — system status for Dashboard settings tab
 # /api/status — Dashboard 设置页用系统状态
 # =============================================================
-# =============================================================
-# /api/export-buckets — export all memory buckets
-# 临时导出全部记忆桶
-# =============================================================
-@mcp.custom_route("/api/export-buckets", methods=["GET"])
-async def api_export_buckets(request):
-    from starlette.responses import JSONResponse
-
-    err = _require_auth(request)
-    if err:
-        return err
-
-    try:
-        buckets = await bucket_mgr.list_all(include_archive=True)
-
-        return JSONResponse({
-            "count": len(buckets),
-            "buckets": buckets
-        })
-
-    except Exception as e:
-        return JSONResponse(
-            {"error": str(e)},
-            status_code=500
-        )
 @mcp.custom_route("/api/status", methods=["GET"])
 async def api_system_status(request):
     """Return detailed system status for the settings panel."""
