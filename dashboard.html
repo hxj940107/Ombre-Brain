@@ -1264,6 +1264,54 @@ async function renameBucket(id) {
     }
 }
 
+async function mergeSelectedBuckets() {
+
+  var checks = document.querySelectorAll('.bucket-check:checked');
+
+  if (checks.length < 2) {
+    alert('至少选择两个记忆桶');
+    return;
+  }
+
+  var ids = Array.from(checks).map(function(c) {
+    return c.value;
+  });
+
+  var name = prompt('请输入合并后的名称：');
+
+  if (!name) {
+    return;
+  }
+
+  try {
+
+    var res = await fetch(BASE + '/api/merge-buckets', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        bucket_ids: ids,
+        name: name
+      })
+    });
+
+    var data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || '合并失败');
+      return;
+    }
+
+    alert('合并成功');
+
+    await loadBuckets();
+
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
 async function saveContent(id) {
 
     const content = document.getElementById("content-editor").value;
