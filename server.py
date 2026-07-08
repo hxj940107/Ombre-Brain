@@ -2032,7 +2032,48 @@ async def api_pin_bucket(request):
             status_code=500
         )
 
+@mcp.custom_route("/api/rename", methods=["POST"])
+async def api_rename_bucket(request):
+    from starlette.responses import JSONResponse
 
+    err = _require_auth(request)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+
+        bucket_id = body.get("bucket_id")
+        name = body.get("name")
+
+        if not bucket_id or not name:
+            return JSONResponse(
+                {"error": "missing bucket_id or name"},
+                status_code=400
+            )
+
+        ok = await bucket_mgr.update(
+            bucket_id,
+            name=name
+        )
+
+        if not ok:
+            return JSONResponse(
+                {"error": "bucket not found"},
+                status_code=404
+            )
+
+        return JSONResponse({
+            "success": True,
+            "bucket_id": bucket_id,
+            "name": name
+        })
+
+    except Exception as e:
+        return JSONResponse(
+            {"error": str(e)},
+            status_code=500
+        )
 # =============================================================
 # /api/status — system status for Dashboard settings tab
 # /api/status — Dashboard 设置页用系统状态
