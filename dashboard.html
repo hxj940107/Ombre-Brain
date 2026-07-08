@@ -1144,7 +1144,8 @@ function renderBuckets(buckets) {
     var vPos = Math.round(b.valence * 100);
     var modelV = b.model_valence != null ? ' → V' + b.model_valence.toFixed(1) : '';
     var timeAgo = formatTimeAgo(b.last_active || b.created);
-    return '<div class="bucket-row" onclick="showDetail(\'' + b.id + '\')">' +
+    return '<div class="bucket-row">' +
+      '<input type="checkbox" class="bucket-check" value="' + b.id + '" onclick="event.stopPropagation()">' +
       '<span class="icon">' + icon + '</span>' +
       '<span class="name" title="' + esc(b.name) + '">' + esc(b.name) + '</span>' +
       '<span class="domain">' + (b.domain || []).join(', ') + '</span>' +
