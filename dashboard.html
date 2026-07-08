@@ -1220,6 +1220,10 @@ async function showDetail(id) {
       esc(b.content) +
       '</textarea>' +
       '<button onclick="saveContent(\'' + id + '\')">💾 保存内容</button>' +
+      '<button onclick="deleteBucket(\'' + id + '\')" ' +
+      'style="margin-top:15px;background:#b33;color:white;padding:8px 14px;border-radius:8px;">' +
+      '🗑️ 删除 Bucket' +
+      '</button>' +
       '</div>';
       
   } catch (e) {
@@ -1342,7 +1346,38 @@ async function saveContent(id) {
         alert(e.message);
     }
 }
+async function deleteBucket(id) {
 
+  if (!confirm("确定删除这个 Bucket？此操作不可恢复")) {
+    return;
+  }
+
+  try {
+    const res = await fetch(BASE + "/api/delete-bucket", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        bucket_id: id
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "删除失败");
+      return;
+    }
+
+    alert("删除成功");
+    closeDetail();
+    await loadBuckets();
+
+  } catch (e) {
+    alert(e.message);
+  }
+}
 async function togglePin(id, pinned) {
   try {
     const res = await fetch(BASE + "/api/pin", {
