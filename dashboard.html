@@ -1178,6 +1178,10 @@ async function showDetail(id) {
     var meta = b.metadata || {};
     content.innerHTML =
       '<h2>' + esc(meta.name || id) + '</h2>' +
+      '<div style="margin:10px 0;">' +
+      '<input id="rename-input" value="' + esc(meta.name || '') + '" placeholder="输入新名称">' +
+      '<button onclick="renameBucket(\'' + id + '\')">✏️ 修改名称</button>' +
+      '</div>' +
       '<div class="detail-meta">' +
         '<div class="field"><label>ID</label>' + id + '</div>' +
         '<div class="field"><label>类型</label>' + (meta.type || 'dynamic') + '</div>' +
@@ -1208,6 +1212,42 @@ async function showDetail(id) {
   }
 }
 
+async function renameBucket(id) {
+
+    const input = document.getElementById("rename-input");
+
+    if (!input.value.trim()) {
+        alert("名称不能为空");
+        return;
+    }
+
+    try {
+
+        const res = await fetch(BASE + "/api/rename", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                bucket_id: id,
+                name: input.value.trim()
+            })
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            alert(data.error || "修改失败");
+            return;
+        }
+
+        await loadBuckets();
+        await showDetail(id);
+
+    } catch(e) {
+        alert(e.message);
+    }
+}
 async function togglePin(id, pinned) {
   try {
     const res = await fetch(BASE + "/api/pin", {
