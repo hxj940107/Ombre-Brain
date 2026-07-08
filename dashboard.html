@@ -1155,12 +1155,12 @@ function renderBuckets(buckets) {
     return '<div class="bucket-row">' +
       '<input type="checkbox" class="bucket-check" value="' + b.id + '" onclick="event.stopPropagation()">' +
       '<span class="icon">' + icon + '</span>' +
-      '<span class="name" title="' + esc(b.name) + '">' + esc(b.name) + '</span>' +
+      '<span class="name" title="' + esc(b.name) + '" onclick="showDetail(\'' + b.id + '\')">' + esc(b.name) + '</span>' +
       '<span class="domain">' + (b.domain || []).join(', ') + '</span>' +
       '<span class="emotion"><span class="v-bar"><span class="v-dot" style="left:' + vPos + '%"></span></span>' + modelV + '</span>' +
       '<span class="score">' + b.score.toFixed(2) + '</span>' +
       '<span class="time">' + timeAgo + '</span>' +
-      '<span class="preview">' + esc(b.content_preview) + '</span>' +
+      '<span class="preview" onclick="showDetail(\'' + b.id + '\')">' + esc(b.content_preview) + '</span>' +
     '</div>';
   }).join('');
 }
