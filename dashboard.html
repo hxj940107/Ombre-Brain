@@ -1206,7 +1206,13 @@ async function showDetail(id) {
         '</button>' +
       '</div>' +
 
-      '<div class="detail-content">' + esc(b.content) + '</div>';
+      '<div class="detail-content">' +
+      '<textarea id="content-editor" style="width:100%;height:300px;">' +
+      esc(b.content) +
+      '</textarea>' +
+      '<button onclick="saveContent(\'' + id + '\')">💾 保存内容</button>' +
+      '</div>';
+      
   } catch (e) {
     content.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
   }
@@ -1248,6 +1254,38 @@ async function renameBucket(id) {
         alert(e.message);
     }
 }
+
+async function saveContent(id) {
+
+    const content = document.getElementById("content-editor").value;
+
+    try {
+
+        const res = await fetch(BASE + "/api/update-content", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                bucket_id: id,
+                content: content
+            })
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            alert(data.error || "保存失败");
+            return;
+        }
+
+        alert("保存成功");
+
+    } catch(e) {
+        alert(e.message);
+    }
+}
+
 async function togglePin(id, pinned) {
   try {
     const res = await fetch(BASE + "/api/pin", {
