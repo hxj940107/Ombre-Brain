@@ -2122,6 +2122,101 @@ async def api_update_bucket_content(request):
             {"error": str(e)},
             status_code=500
         )
+
+# =============================================================
+# /api/merge-buckets — merge multiple memory buckets
+# 合并多个记忆桶
+# =============================================================
+@mcp.custom_route("/api/merge-buckets", methods=["POST"])
+async def api_merge_buckets(request):
+    from starlette.responses import JSONResponse
+
+    err = _require_auth(request)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+
+        bucket_ids = body.get("bucket_ids", [])
+        name = body.get("name")
+
+        if len(bucket_ids) < 2:
+            return JSONResponse(
+                {"error": "need at least 2 buckets"},
+                status_code=400
+            )
+
+        if not name:
+            return JSONResponse(
+                {"error": "missing name"},
+                status_code=400
+            )
+
+        buckets = []
+
+        for bid in bucket_ids:
+            b = await bucket_mgr.get(bid)
+
+            if not b:
+                return JSONResponse(
+                    {"error": f"bucket not found: {bid}"},
+                    status_code=404
+                )
+
+            buckets.append(b)
+
+        # merge content
+        merged_content = "\n\n---\n\n".join(
+            [
+                b["content"]
+                for b in buckets
+            ]
+        )
+
+        # inherit metadata
+        first = buckets[0]["metadata"]
+
+        new_id = await bucket_mgr.create(
+            content=merged_content,
+            name=name,
+            tags=list(set(
+                sum(
+                    [
+                        b["metadata"].get("tags", [])
+                        for b in buckets
+                    ],
+                    []
+                )
+            )),
+            domain=first.get("domain", ["未分类"]),
+            importance=max(
+                b["metadata"].get("importance", 5)
+                for b in buckets
+            ),
+            bucket_type=first.get("type", "dynamic"),
+            pinned=any(
+                b["metadata"].get("pinned", False)
+                for b in buckets
+            )
+        )
+
+        # archive old buckets
+        for bid in bucket_ids:
+            await bucket_mgr.archive(bid)
+
+        return JSONResponse({
+            "success": True,
+            "new_bucket_id": new_id
+        })
+
+    except Exception as e:
+        return JSONResponse(
+            {"error": str(e)},
+            status_code=500
+        )
+
+
 @mcp.custom_route("/api/status", methods=["GET"])
 async def api_system_status(request):
     """Return detailed system status for the settings panel."""
