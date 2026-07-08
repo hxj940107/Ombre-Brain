@@ -1383,7 +1383,7 @@ async def api_buckets(request):
     err = _require_auth(request)
     if err: return err
     try:
-        all_buckets = await bucket_mgr.list_all(include_archive=True)
+        all_buckets = await bucket_mgr.list_all(include_archive=False)
         result = []
         for b in all_buckets:
             meta = b.get("metadata", {})
