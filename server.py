@@ -2078,6 +2078,50 @@ async def api_rename_bucket(request):
 # /api/status — system status for Dashboard settings tab
 # /api/status — Dashboard 设置页用系统状态
 # =============================================================
+# /api/update-content — update bucket content
+# 修改记忆桶内容
+# =============================================================
+@mcp.custom_route("/api/update-content", methods=["POST"])
+async def api_update_bucket_content(request):
+    from starlette.responses import JSONResponse
+
+    err = _require_auth(request)
+    if err:
+        return err
+
+    try:
+        body = await request.json()
+
+        bucket_id = body.get("bucket_id")
+        content = body.get("content")
+
+        if not bucket_id or content is None:
+            return JSONResponse(
+                {"error": "missing bucket_id or content"},
+                status_code=400
+            )
+
+        ok = await bucket_mgr.update(
+            bucket_id,
+            content=content
+        )
+
+        if not ok:
+            return JSONResponse(
+                {"error": "bucket not found"},
+                status_code=404
+            )
+
+        return JSONResponse({
+            "success": True,
+            "bucket_id": bucket_id
+        })
+
+    except Exception as e:
+        return JSONResponse(
+            {"error": str(e)},
+            status_code=500
+        )
 @mcp.custom_route("/api/status", methods=["GET"])
 async def api_system_status(request):
     """Return detailed system status for the settings panel."""
