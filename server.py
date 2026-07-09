@@ -331,7 +331,7 @@ async def breath_hook(request):
         # pinned
         pinned = [
             b for b in all_buckets
-            if b["metadata"].get("pinned") or b["metadata"].get("protected")
+            if b["metadata"].get("pinned") 
         ]
         logger.info(f"PINNED BUCKETS: {len(pinned)}")
         for b in pinned:
