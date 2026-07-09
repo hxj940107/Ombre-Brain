@@ -357,45 +357,13 @@ async def breath_hook(request):
         parts = []
         token_budget = 1000
 
-        for b in pinned[:5]:
+        for b in pinned[:8]:
             summary = await dehydrator.dehydrate(
                 strip_wikilinks(b["content"]),
                 {k: v for k, v in b["metadata"].items() if k != "tags"}
             )
             parts.append(f"📌 [核心准则] {summary}")
             token_budget -= count_tokens_approx(summary)
-
-        # Diversity: top-1 fixed + shuffle rest from top-5
-        candidates = list(scored)
-
-        if len(candidates) > 1:
-            top1 = [candidates[0]]
-            pool = candidates[1:min(5, len(candidates))]
-            random.shuffle(pool)
-            candidates = top1 + pool + candidates[min(5, len(candidates)):]
-
-        # Hard cap
-        candidates = candidates[:3]
-
-        for b in candidates:
-            if token_budget <= 0:
-                break
-
-            summary = await dehydrator.dehydrate(
-                strip_wikilinks(b["content"]),
-                {k: v for k, v in b["metadata"].items() if k != "tags"}
-            )
-
-            summary_tokens = count_tokens_approx(summary)
-
-            logger.info(f"MEMORY TOKEN: {summary_tokens}")
-            logger.info(f"MEMORY PREVIEW: {summary[:100]}")
-
-            if summary_tokens > token_budget:
-                break
-
-            parts.append(summary)
-            token_budget -= summary_tokens
 
         if not parts:
             await _fire_webhook("breath_hook", {"surfaced": 0})
