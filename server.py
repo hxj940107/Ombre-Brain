@@ -326,12 +326,14 @@ async def breath_hook(request):
 
     try:
         all_buckets = await bucket_mgr.list_all(include_archive=False)
+        logger.info(f"TOTAL BUCKETS: {len(all_buckets)}")
 
         # pinned
         pinned = [
             b for b in all_buckets
             if b["metadata"].get("pinned") or b["metadata"].get("protected")
         ]
+        logger.info(f"PINNED BUCKETS: {len(pinned)}")
 
         # unresolved
         unresolved = [
