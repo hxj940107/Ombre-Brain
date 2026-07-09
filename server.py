@@ -431,7 +431,64 @@ async def breath_hook(request):
         logger.warning(f"Breath hook failed: {e}")
         return PlainTextResponse("")
 
+# =============================================================
+# /memory-search endpoint
+# 根据用户输入搜索相关记忆
+# =============================================================
+@mcp.custom_route("/memory-search", methods=["GET"])
+async def memory_search(request):
 
+    from starlette.responses import PlainTextResponse
+
+    try:
+
+        query = request.query_params.get("query", "")
+
+        if not query.strip():
+            return PlainTextResponse("")
+
+
+        matches = await bucket_mgr.search(
+            query,
+            limit=5
+        )
+
+
+        if not matches:
+            return PlainTextResponse("")
+
+
+        parts = []
+
+
+        for b in matches:
+
+            summary = await dehydrator.dehydrate(
+                strip_wikilinks(b["content"]),
+                {
+                    k: v
+                    for k, v in b["metadata"].items()
+                    if k != "tags"
+                }
+            )
+
+            parts.append(summary)
+
+
+        return PlainTextResponse(
+            "[Ombre Brain - 相关记忆]\n"
+            +
+            "\n---\n".join(parts)
+        )
+
+
+    except Exception as e:
+
+        logger.warning(
+            f"Memory search failed: {e}"
+        )
+
+        return PlainTextResponse("")
 # =============================================================
 # /dream-hook endpoint: Dedicated hook for Dreaming
 # Dreaming 专用挂载点
