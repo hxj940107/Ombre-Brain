@@ -334,6 +334,10 @@ async def breath_hook(request):
             if b["metadata"].get("pinned") or b["metadata"].get("protected")
         ]
         logger.info(f"PINNED BUCKETS: {len(pinned)}")
+        for b in pinned:
+            logger.info(
+                f"PINNED ITEM: {b['content'][:80]}"
+            )
 
         # unresolved
         unresolved = [
